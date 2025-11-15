@@ -23,8 +23,7 @@ import androidx.camera.core.CameraControl
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
-import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.lifecycle.awaitInstance
+import androidx.camera.lifecycle.*
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -56,32 +55,32 @@ import com.example.application.WithPermission
 import com.example.application.ui.theme.CameraXWorkshopTheme
 import java.io.File
 
-@Composable 
-fun Pbutton(imageCaptureUseCase: androidx.camera.core.ImageCapture) {
-    val localContext = LocalContext.current
-
-    fun handleClick() {
-        val outputFileOptions = ImageCapture.OutputFileOptions.Builder(File(localContext.externalCacheDir, "image.jpg"))
-            .build()
-        val callback = object: ImageCapture.OnImageSavedCallback {
-            override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                outputFileResults.savedUri?.shareAsImage(localContext)
-            }
-
-            override fun onError(exception: ImageCaptureException) {
-            }
-        }
-        imageCaptureUseCase.takePicture(outputFileOptions, ContextCompat.getMainExecutor(localContext), callback)
-    }
-
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.BottomCenter
-    ) {
-        Image(
-            painter = painterResource(id = R.drawable.cameraclicker),
-            contentDescription="",
-            modifier=Modifier.clickable(onClick = {handleClick()})
-        )
-    }
-}
+//@Composable
+//fun Pbutton(imageCaptureUseCase: androidx.camera.core.ImageCapture) {
+//    val localContext = LocalContext.current
+//
+//    fun handleClick() {
+//        val outputFileOptions = ImageCapture.OutputFileOptions.Builder(File(localContext.externalCacheDir, "image.jpg"))
+//            .build()
+//        val callback = object: ImageCapture.OnImageSavedCallback {
+//            override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+//                outputFileResults.savedUri?.shareAsImage(localContext)
+//            }
+//
+//            override fun onError(exception: ImageCaptureException) {
+//            }
+//        }
+//        imageCaptureUseCase.takePicture(outputFileOptions, ContextCompat.getMainExecutor(localContext), callback)
+//    }
+//
+//    Box(
+//        modifier = Modifier.fillMaxSize(),
+//        contentAlignment = Alignment.BottomCenter
+//    ) {
+//        Image(
+//            painter = painterResource(id = R.drawable.cameraclicker),
+//            contentDescription="",
+//            modifier=Modifier.clickable(onClick = {handleClick()})
+//        )
+//    }
+//}
