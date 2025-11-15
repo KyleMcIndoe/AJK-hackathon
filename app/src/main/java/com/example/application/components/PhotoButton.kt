@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.Modifier.*
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.application.ui.theme.ApplicationTheme
@@ -35,6 +34,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -57,7 +60,7 @@ import java.io.File
 fun Pbutton(imageCaptureUseCase: androidx.camera.core.ImageCapture) {
     val localContext = LocalContext.current
 
-    Button(onClick = {
+    fun handleClick() {
         val outputFileOptions = ImageCapture.OutputFileOptions.Builder(File(localContext.externalCacheDir, "image.jpg"))
             .build()
         val callback = object: ImageCapture.OnImageSavedCallback {
@@ -69,7 +72,16 @@ fun Pbutton(imageCaptureUseCase: androidx.camera.core.ImageCapture) {
             }
         }
         imageCaptureUseCase.takePicture(outputFileOptions, ContextCompat.getMainExecutor(localContext), callback)
-    }) {
-        Text("Take Photo")
-    }  
+    }
+
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        Image(
+            painter = painterResource(id = R.drawable.cameraclicker),
+            contentDescription="",
+            modifier=Modifier.clickable(onClick = {handleClick()})
+        )
+    }
 }
