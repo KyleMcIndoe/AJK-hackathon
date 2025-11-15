@@ -39,7 +39,6 @@ import java.io.File
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
-import kotlin.fold
 
 class MainActivity : ComponentActivity() {
     private val repository = DiscogsRepository()
@@ -54,64 +53,40 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.padding(innerPadding),
                         permission = Manifest.permission.CAMERA
                     ) {
-                        CameraAppScreen(
-                            onImageCaptured = { uri ->
-                                processImage(uri)
-                            }
-                        )
+                        VinylScannerApp()
                     }
                 }
             }
-        }
-    }
-
-    private fun processImage(uri: Uri) {
-        lifecycleScope.launch {
-            try {
-                val image = InputImage.fromFilePath(this@MainActivity, uri)
-                val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-
-                recognizer.process(image)
-                    .addOnSuccessListener { visionText ->
-                        val extractedText = visionText.text
-                        Log.d("VinylScanner", "Extracted text: $extractedText")
-
-                        // Search Discogs with the extracted text
-                        searchDiscogs(extractedText)
-                    }
-                    .addOnFailureListener { e ->
-                        Log.e("VinylScanner", "Text recognition failed", e)
-                    }
-            } catch (e: Exception) {
-                Log.e("VinylScanner", "Image processing failed", e)
-            }
-        }
-    }
-
-    private fun searchDiscogs(query: String) {
-        lifecycleScope.launch {
-            repository.searchByAlbumName(query).fold(
-                onSuccess = { searchResponse ->
-                    Log.d("VinylScanner", "Found ${searchResponse.results.size} results")
-                    searchResponse.results.forEach { result ->
-                        Log.d("VinylScanner", """
-                            Title: ${result.title}
-                            Year: ${result.year}
-                            Genres: ${result.genre?.joinToString()}
-                        """.trimIndent())
-                    }
-                },
-                onFailure = { error ->
-                    Log.e("VinylScanner", "Discogs search failed: ${error.message}")
-                }
-            )
         }
     }
 }
 
 @Composable
+fun VinylScannerApp() {
+    // Navigation state - which screen to show
+    var selectedRelease by remember { mutableStateOf<Release?>(null) }
+
+    // If no album selected, show camera screen
+    // If album selected, show details screen with recommendations
+    if (selectedRelease == null) {
+        CameraAppScreen(
+            onAlbumSelected = { release ->
+                selectedRelease = release
+            }
+        )
+    } else {
+        AlbumDetailsScreen(
+            release = selectedRelease!!,
+            onBack = {
+                selectedRelease = null // Go back to camera
+            }
+        )
+    }
+}
+
+@Composable
 fun CameraAppScreen(
-    onImageCaptured: (Uri) -> Unit = {}
+    onAlbumSelected: (Release) -> Unit = {}  // ← NEW: Callback when album tapped
 ) {
     var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
     var zoomLevel by remember { mutableFloatStateOf(0.0f) }
@@ -226,7 +201,7 @@ fun CameraAppScreen(
                 Text("Scan Vinyl Record", style = MaterialTheme.typography.titleMedium)
             }
 
-            if (showResults) {
+            if (showResults && searchResults.isNotEmpty()) {
                 Button(
                     onClick = { showResults = true },
                     modifier = Modifier.fillMaxWidth()
@@ -237,7 +212,7 @@ fun CameraAppScreen(
         }
     }
 
-    // Results bottom sheet or dialog
+    // Results dialog
     if (showResults && searchResults.isNotEmpty()) {
         AlertDialog(
             onDismissRequest = { showResults = false },
@@ -246,12 +221,12 @@ fun CameraAppScreen(
                 LazyColumn {
                     items(searchResults) { result ->
                         AlbumResultItem(result) { releaseId ->
-                            // Navigate to details or show more info
+                            // ← CHANGED: Now fetches full details and navigates
                             scope.launch {
                                 repository.getReleaseDetails(releaseId).fold(
                                     onSuccess = { release ->
-                                        Log.d("VinylScanner", "Full details: $release")
-                                        // You can navigate to a details screen here
+                                        showResults = false // Close dialog
+                                        onAlbumSelected(release) // Navigate to details screen
                                     },
                                     onFailure = { error ->
                                         Log.e("VinylScanner", "Failed to get details", error)
