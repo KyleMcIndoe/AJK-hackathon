@@ -12,8 +12,8 @@ import androidx.camera.core.CameraControl
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.lifecycle.awaitInstance
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -29,13 +29,17 @@ import androidx.core.content.ContextCompat
 import androidx.core.net.toFile
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
+import com.example.application.data.repository.DiscogsRepository
 import com.example.application.ui.theme.ApplicationTheme
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.launch
 import java.io.File
-
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlin.coroutines.suspendCoroutine
+import kotlin.fold
 
 class MainActivity : ComponentActivity() {
     private val repository = DiscogsRepository()
@@ -343,7 +347,7 @@ fun CameraPreview(
     zoomLevel: Float,
     imageCaptureUseCase: ImageCapture
 ) {
-    val previewUseCase = remember { androidx.camera.core.Preview.Builder().build() }
+    val previewUseCase = remember { Preview.Builder().build() }
     var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
     var cameraControl by remember { mutableStateOf<CameraControl?>(null) }
     val localContext = LocalContext.current
@@ -365,7 +369,12 @@ fun CameraPreview(
     }
 
     LaunchedEffect(Unit) {
-        cameraProvider = ProcessCameraProvider.awaitInstance(localContext)
+        cameraProvider = suspendCoroutine { continuation ->
+            val cameraProviderFuture = ProcessCameraProvider.getInstance(localContext)
+            cameraProviderFuture.addListener({
+                continuation.resume(cameraProviderFuture.get())
+            }, ContextCompat.getMainExecutor(localContext))
+        }
         rebindCameraProvider()
     }
 
@@ -381,7 +390,7 @@ fun CameraPreview(
         modifier = modifier.fillMaxSize(),
         factory = { context ->
             PreviewView(context).also {
-                previewUseCase.surfaceProvider = it.surfaceProvider
+                previewUseCase.setSurfaceProvider(it.surfaceProvider)
                 rebindCameraProvider()
             }
         }

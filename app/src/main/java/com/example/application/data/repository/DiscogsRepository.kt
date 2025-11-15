@@ -1,8 +1,8 @@
 package com.example.application.data.repository
 
+import com.example.application.Release
+import com.example.application.SearchResponse
 import com.example.application.data.api.DiscogsApiClient
-import com.example.application.data.models.Release
-import com.example.application.data.models.SearchResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 

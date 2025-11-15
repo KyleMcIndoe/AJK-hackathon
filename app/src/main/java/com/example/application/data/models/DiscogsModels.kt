@@ -1,4 +1,4 @@
-package com.example.application.data.models
+package com.example.application
 
 data class SearchResponse(
     val results: List<SearchResult>,

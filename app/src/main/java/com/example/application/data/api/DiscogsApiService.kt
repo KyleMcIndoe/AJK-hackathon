@@ -1,7 +1,7 @@
 package com.example.application.data.api
 
-import com.example.application.data.models.Release
-import com.example.application.data.models.SearchResponse
+import com.example.application.Release
+import com.example.application.SearchResponse
 import retrofit2.http.*
 
 interface DiscogsApiService {
