@@ -73,7 +73,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun CameraAppScreen() {
-    var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_FRONT) }
+    var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
     var zoomLevel by remember { mutableFloatStateOf(0.0f) }
     val imageCaptureUseCase = remember { ImageCapture.Builder().build() }
 
@@ -86,44 +86,7 @@ fun CameraAppScreen() {
            imageCaptureUseCase = imageCaptureUseCase
        )
 
-       Column(modifier = Modifier.align(Alignment.BottomCenter)) {
-            Row {
-                Button(onClick = { lensFacing = CameraSelector.LENS_FACING_FRONT }) {
-                    Text("Front camera")
-                }
-                Button(onClick = { lensFacing = CameraSelector.LENS_FACING_BACK }) {
-                    Text("Back camera")
-                }
-            }
-
-           Row {
-               Button(onClick = { zoomLevel = 0.0f }) {
-                   Text("Zoom 0.0")
-               }
-               Button(onClick = { zoomLevel = 0.5f }) {
-                   Text("Zoom 0.5")
-               }
-               Button(onClick = { zoomLevel = 1.0f }) {
-                   Text("Zoom 1.0")
-               }
-           }
-
-           Button(onClick = {
-               val outputFileOptions = ImageCapture.OutputFileOptions.Builder(File(localContext.externalCacheDir, "image.jpg"))
-                   .build()
-               val callback = object: ImageCapture.OnImageSavedCallback {
-                   override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                       outputFileResults.savedUri?.shareAsImage(localContext)
-                   }
-
-                   override fun onError(exception: ImageCaptureException) {
-                   }
-               }
-               imageCaptureUseCase.takePicture(outputFileOptions, ContextCompat.getMainExecutor(localContext), callback)
-           }) {
-               Text("Take Photo")
-           }
-       }
+        Pbutton(imageCaptureUseCase)
     }
 }
 
