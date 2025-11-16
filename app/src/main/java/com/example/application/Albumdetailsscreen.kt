@@ -6,10 +6,13 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.application.data.models.LastFmArtistInfo
@@ -23,6 +26,7 @@ fun AlbumDetailsScreen(
     release: Release,
     onBack: () -> Unit
 ) {
+    val localContext = LocalContext.current
     var similarArtists by remember { mutableStateOf<List<SimilarArtist>>(emptyList()) }
     var artistInfo by remember { mutableStateOf<LastFmArtistInfo?>(null) }
     var topTracks by remember { mutableStateOf<List<LastFmTrack>>(emptyList()) }
@@ -116,6 +120,30 @@ fun AlbumDetailsScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
+                    // Spotify button
+                    Button(
+                        onClick = {
+                            SpotifyHelper.openAlbumInSpotify(
+                                context = localContext,
+                                albumName = release.title,
+                                artistName = release.artists.firstOrNull()?.name ?: ""
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = "Play on Spotify"
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Play on Spotify")
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     // Pricing info
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -199,7 +227,14 @@ fun AlbumDetailsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 4.dp)
-                        .clickable { /* Could open Spotify/YouTube here */ }
+                        .clickable {
+                            // Open track in Spotify
+                            SpotifyHelper.openTrackInSpotify(
+                                context = localContext,
+                                trackName = track.name,
+                                artistName = release.artists.firstOrNull()?.name ?: ""
+                            )
+                        }
                 ) {
                     Row(
                         modifier = Modifier
@@ -214,14 +249,25 @@ fun AlbumDetailsScreen(
                                 style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.Medium
                             )
-                            Text(
-                                text = "${track.playcount} plays",
-                                style = MaterialTheme.typography.bodySmall
-                            )
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "${track.playcount} plays",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                                Text(
+                                    text = "• Tap to play on Spotify",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
-                        Text(
-                            text = "▶",
-                            style = MaterialTheme.typography.headlineSmall
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Default.PlayArrow,
+                            contentDescription = "Play on Spotify",
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
@@ -330,11 +376,16 @@ fun SimilarArtistCard(
     artist: SimilarArtist,
     onClick: () -> Unit
 ) {
+    val localContext = LocalContext.current
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
-            .clickable(onClick = onClick)
+            .clickable {
+                // Open artist in Spotify
+                SpotifyHelper.openArtistInSpotify(localContext, artist.name)
+            }
     ) {
         Row(
             modifier = Modifier
@@ -363,16 +414,27 @@ fun SimilarArtistCard(
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium
                 )
-                Text(
-                    text = "${(artist.match.toDoubleOrNull()?.times(100))?.toInt() ?: 0}% match",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary
-                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "${(artist.match.toDoubleOrNull()?.times(100))?.toInt() ?: 0}% match",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                    Text(
+                        text = "• Tap to play on Spotify",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
 
-            Text(
-                text = "→",
-                style = MaterialTheme.typography.headlineSmall
+            Icon(
+                imageVector = Icons.Default.PlayArrow,
+                contentDescription = "Play on Spotify",
+                tint = MaterialTheme.colorScheme.primary
             )
         }
     }
