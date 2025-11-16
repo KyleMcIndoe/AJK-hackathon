@@ -12,7 +12,21 @@ def identify_album(image_path, x1, y1, x2, y2):
     """
     Takes an image + crop rectangle, extracts that region,
     predicts its album, and returns {album, artist}.
+
+    If x2 and y2 are both 0, use the image's full width and height.
     """
+
+    # Load the image to determine dimensions if needed
+    img = cv2.imread(image_path)
+    if img is None:
+        return {"error": "Image unreadable"}
+
+    h, w = img.shape[:2]
+
+    # If x2 and y2 are 0, use image width and height
+    if x2 == 0 and y2 == 0:
+        x2 = w
+        y2 = h
 
     cover = extract_album_cover.extract_cover(image_path, x1, y1, x2, y2)
     if cover is None:
