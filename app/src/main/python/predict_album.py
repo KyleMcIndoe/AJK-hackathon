@@ -1,63 +1,24 @@
 import os
 import json
 import numpy as np
-from PIL import Image
+import tensorflow as tf
 from sklearn.preprocessing import normalize
-import tflite_runtime.interpreter as tflite
-
+from tensorflow.keras.preprocessing.image import load_img, img_to_array
 
 base_path = os.path.dirname(os.path.abspath(__file__))
 
-# -------------------------------------------
-# Load embeddings + labels
-# -------------------------------------------
+# Load index
 embeddings = np.load(os.path.join(base_path, "embeddings.npy"))
 with open(os.path.join(base_path, "labels.json"), "r", encoding="utf-8") as f:
     labels = json.load(f)
 
-# -------------------------------------------
-# Load TensorFlow Lite model
-# -------------------------------------------
-tflite_path = os.path.join(base_path, "efficientnetb0_embed.tflite")
-
-interpreter = tflite.Interpreter(model_path=tflite_path)
-interpreter.allocate_tensors()
-
-input_details = interpreter.get_input_details()
-output_details = interpreter.get_output_details()
-
-
-# -------------------------------------------
-# Image preprocessing (PIL version)
-# -------------------------------------------
-def load_and_preprocess(path):
-    # Load with Pillow
-    img = Image.open(path).convert("RGB")
-    img = img.resize((224, 224), Image.BILINEAR)
-
-    # Convert to float32 numpy array
-    arr = np.array(img, dtype=np.float32)
-
-    # EfficientNet-like normalization (same as tf.keras preprocessing)
-    arr = arr / 127.5 - 1.0     # Match tf.keras.applications.efficientnet.preprocess_input
-
-    # Add batch dimension
-    return np.expand_dims(arr, axis=0)
-
-
-# -------------------------------------------
-# Helper to run the model
-# -------------------------------------------
-def get_embedding(path):
-    arr = load_and_preprocess(path)
-
-    interpreter.set_tensor(input_details[0]["index"], arr)
-    interpreter.invoke()
-
-    vec = interpreter.get_tensor(output_details[0]["index"])[0]
-
-    return normalize(vec.reshape(1, -1))[0]
-
+# SAME MODEL AS INDEX BUILDER
+embedding_model = tf.keras.applications.EfficientNetB0(
+    include_top=False,
+    weights="imagenet",
+    pooling="avg",
+    input_shape=(224, 224, 3)
+)
 
 def parse_label(label):
     album, artist = label.split("---")
@@ -65,18 +26,24 @@ def parse_label(label):
     artist = artist.replace("_", " ").title()
     return album, artist
 
+def get_embedding(path):
+    img = load_img(path, target_size=(224, 224))
+    arr = img_to_array(img)
+    arr = tf.keras.applications.efficientnet.preprocess_input(arr)
+    arr = np.expand_dims(arr, 0)
 
-# -------------------------------------------
-# Prediction function
-# -------------------------------------------
+    vec = embedding_model.predict(arr, verbose=0)[0]
+    return normalize(vec.reshape(1, -1))[0]
+
 def predict(img_path, return_values=False):
     query_vec = get_embedding(img_path)
 
     scores = np.dot(embeddings, query_vec)
     idx = np.argmax(scores)
     best_score = scores[idx]
+    label = labels[idx]
 
-    album, artist = parse_label(labels[idx])
+    album, artist = parse_label(label)
 
     if return_values:
         return album, artist
