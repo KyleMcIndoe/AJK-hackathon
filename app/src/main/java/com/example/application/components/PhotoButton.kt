@@ -101,9 +101,8 @@ fun PhotoButton(imageCaptureUseCase: ImageCapture, showResults: Boolean, setShow
                     val callback = object : ImageCapture.OnImageSavedCallback {
                         override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
                             // image saved at file:///storage/emulated/0/Android/data/com.example.application/cache/vinyl_1763293439252.jpg
-                            //Python.start()
                             val py = Python.getInstance()
-                            val module = py.getModule("predictor_from_image")
+                            val module = py.getModule("predict_from_image")
                             val pyResult = module.callAttr("predict_from_image", "${outputFileResults.savedUri}")
                         }
 

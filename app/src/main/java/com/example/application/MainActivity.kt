@@ -40,6 +40,10 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
 
+import com.chaquo.python.Python
+import com.chaquo.python.android.AndroidPlatform
+import org.json.JSONObject
+
 class MainActivity : ComponentActivity() {
     private val repository = DiscogsRepository()
 
