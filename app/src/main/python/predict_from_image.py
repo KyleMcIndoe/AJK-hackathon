@@ -1,54 +1,54 @@
 import os
 import uuid
 import json
+import sys
+import cv2
 
-# Import your existing modules
 import extract_album_cover
-import predict_main
+import predict_album
 
 
-def identify_album(image_path):
+def identify_album(image_path, x1, y1, x2, y2):
     """
-    Takes a full image, extracts album cover, runs prediction,
-    and returns { "album": ..., "artist": ... }.
+    Takes an image + crop rectangle, extracts that region,
+    predicts its album, and returns {album, artist}.
     """
 
-    # 1. Extract cropped cover
-    cover = extract_album_cover.extract_cover(image_path)
+    cover = extract_album_cover.extract_cover(image_path, x1, y1, x2, y2)
     if cover is None:
-        return {"error": "No album cover detected"}
+        return {"error": "Invalid crop or image unreadable"}
 
-    # 2. Save temp cropped image (Kotlin may call repeatedly → use uuid)
+    # Save temp cropped image
     temp_filename = f"temp_cover_{uuid.uuid4().hex}.jpg"
     temp_path = os.path.join(os.path.dirname(__file__), temp_filename)
 
-    import cv2
     cv2.imwrite(temp_path, cover)
 
-    # 3. Predict the album + artist using your existing predict() logic
-    album, artist = predict_main.predict(temp_path, return_values=True)
+    # Predict
+    album, artist = predict_album.predict(temp_path, return_values=True)
 
-    # Remove temp file
+    # Cleanup temp file
     try:
         os.remove(temp_path)
     except:
         pass
 
-    # 4. Return structured result
     return {"album": album, "artist": artist}
 
 
-# Allow Kotlin to call via CLI: python predict_from_image.py /path/to/image.jpg
+# CLI usage:
+# python predict_from_image.py image.jpg x1 y1 x2 y2
 if __name__ == "__main__":
-    import sys
 
-    if len(sys.argv) < 2:
-        print(json.dumps({"error": "No input image provided"}))
+    if len(sys.argv) != 6:
+        print(json.dumps({"error": "Usage: predict_from_image.py image x1 y1 x2 y2"}))
         exit(1)
 
     img_path = sys.argv[1]
+    x1 = int(sys.argv[2])
+    y1 = int(sys.argv[3])
+    x2 = int(sys.argv[4])
+    y2 = int(sys.argv[5])
 
-    result = identify_album(img_path)
-
-    # Kotlin will read from stdout → print JSON
+    result = identify_album(img_path, x1, y1, x2, y2)
     print(json.dumps(result))

@@ -55,5 +55,5 @@ def predict(img_path, return_values=False):
 
 
 if __name__ == "__main__":
-    test_img = os.path.join(base_path, "test3.png")
+    test_img = os.path.join(base_path, "test2.jpg")
     predict(test_img)
