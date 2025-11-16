@@ -119,7 +119,7 @@ fun CameraAppScreen(
                         .padding(16.dp)
                 )
                 Text(
-                    text = "Processing image...",
+                    text = "Processing Album Cover...",
                     color = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.align(Alignment.CenterHorizontally)
                 )
