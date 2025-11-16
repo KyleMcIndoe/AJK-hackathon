@@ -71,6 +71,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
 import androidx.compose.ui.platform.LocalContext
+import android.util.Log
 
 @Composable
 fun PhotoButton(imageCaptureUseCase: ImageCapture, showResults: Boolean, setShowResults: (Boolean) -> Unit, searchResults: List<SearchResult>) {
@@ -91,10 +92,7 @@ fun PhotoButton(imageCaptureUseCase: ImageCapture, showResults: Boolean, setShow
 
                     val callback = object : ImageCapture.OnImageSavedCallback {
                         override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                            outputFileResults.savedUri?.let { uri ->
-                                // Process the image with justins API
-                                isProcessing = false
-                            }
+                            
                         }
 
                         override fun onError(exception: ImageCaptureException) {
@@ -121,4 +119,16 @@ fun PhotoButton(imageCaptureUseCase: ImageCapture, showResults: Boolean, setShow
                 setShowResults(true)
             }
         }
+}
+
+fun runPythonScript(scriptPath: String): String {
+    val process = ProcessBuilder(
+        "python3",
+        "/path/to/predict_from_image.py",
+        "/path/to/photo.jpg"
+    ).redirectErrorStream(true).start()
+
+    val output = process.inputStream.bufferedReader().readText()
+
+    println("Python returned: $output")  // JSON string
 }
