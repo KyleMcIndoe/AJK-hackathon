@@ -92,7 +92,7 @@ fun PhotoButton(imageCaptureUseCase: ImageCapture, showResults: Boolean, setShow
 
                     val callback = object : ImageCapture.OnImageSavedCallback {
                         override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                            
+                            // image saved at file:///storage/emulated/0/Android/data/com.example.application/cache/vinyl_1763293439252.jpg
                         }
 
                         override fun onError(exception: ImageCaptureException) {
@@ -121,7 +121,7 @@ fun PhotoButton(imageCaptureUseCase: ImageCapture, showResults: Boolean, setShow
         }
 }
 
-fun runPythonScript(scriptPath: String): String {
+fun runPythonScript(scriptPath: String): Unit {
     val process = ProcessBuilder(
         "python3",
         "/path/to/predict_from_image.py",
@@ -130,5 +130,5 @@ fun runPythonScript(scriptPath: String): String {
 
     val output = process.inputStream.bufferedReader().readText()
 
-    println("Python returned: $output")  // JSON string
+    Log.d("IMPORTANT", "Python returned: $output")  // JSON string
 }
