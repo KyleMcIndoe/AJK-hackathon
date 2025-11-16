@@ -11,7 +11,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.camera.core.CameraControl
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
-import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -26,29 +25,30 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import androidx.core.net.toFile
 import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.lifecycleScope
 import com.example.application.data.repository.DiscogsRepository
 import com.example.application.ui.theme.ApplicationTheme
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.launch
-import java.io.File
 import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
 
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
-import org.json.JSONObject
 
 class MainActivity : ComponentActivity() {
     private val repository = DiscogsRepository()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Initialize Python BEFORE anything else
+        if (!Python.isStarted()) {
+            Python.start(AndroidPlatform(this))
+        }
+
         enableEdgeToEdge()
         setContent {
             ApplicationTheme {
@@ -90,14 +90,14 @@ fun VinylScannerApp() {
 
 @Composable
 fun CameraAppScreen(
-    onAlbumSelected: (Release) -> Unit = {}  // ← NEW: Callback when album tapped
+    onAlbumSelected: (Release) -> Unit = {}
 ) {
     var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
     var zoomLevel by remember { mutableFloatStateOf(0.0f) }
     val imageCaptureUseCase = remember { ImageCapture.Builder().build() }
 
     var showResults by remember { mutableStateOf(false) }
-    fun setShowResults(arg: Boolean): Unit {showResults = arg}
+    fun setShowResults(arg: Boolean): Unit { showResults = arg }
 
     var searchResults by remember { mutableStateOf<List<SearchResult>>(emptyList()) }
 
@@ -106,7 +106,7 @@ fun CameraAppScreen(
     val scope = rememberCoroutineScope()
 
     fun switchLensFacing(): Unit {
-        if(lensFacing == CameraSelector.LENS_FACING_FRONT) {
+        if (lensFacing == CameraSelector.LENS_FACING_FRONT) {
             lensFacing = CameraSelector.LENS_FACING_BACK
             return Unit
         }
@@ -114,7 +114,7 @@ fun CameraAppScreen(
     }
 
     fun setZoomLevel(): Unit {
-        if(zoomLevel == 2.0f) {
+        if (zoomLevel == 2.0f) {
             zoomLevel = 0.5f
         }
         zoomLevel = zoomLevel + 0.5f
@@ -128,11 +128,17 @@ fun CameraAppScreen(
         )
 
         // Camera controls
-        Column (
+        Column(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.Bottom
         ) {
-            PhotoButton(imageCaptureUseCase, showResults, ::setShowResults, searchResults)
+            // PhotoButton is defined in PhotoButton.kt
+            PhotoButton(
+                imageCaptureUseCase = imageCaptureUseCase,
+                showResults = showResults,
+                setShowResults = ::setShowResults,
+                searchResults = searchResults
+            )
             FooterNav(::switchLensFacing, ::setZoomLevel)
         }
     }
@@ -146,7 +152,6 @@ fun CameraAppScreen(
                 LazyColumn {
                     items(searchResults) { result ->
                         AlbumResultItem(result) { releaseId ->
-                            // ← CHANGED: Now fetches full details and navigates
                             scope.launch {
                                 repository.getReleaseDetails(releaseId).fold(
                                     onSuccess = { release ->
@@ -171,6 +176,7 @@ fun CameraAppScreen(
     }
 }
 
+// This function is still used by some legacy code paths if needed
 suspend fun processImageAndSearch(
     context: Context,
     uri: Uri,
