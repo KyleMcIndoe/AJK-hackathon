@@ -82,13 +82,6 @@ fun PhotoButton(imageCaptureUseCase: ImageCapture, showResults: Boolean, setShow
                 .padding(16.dp).fillMaxWidth(),
             horizontalArrangement = Arrangement.Center
         ) {
-            if (isProcessing) {
-                Text(
-                    text = "Processing image...",
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
-            }
-
             Button(
                 onClick = {
                     isProcessing = true
@@ -100,6 +93,7 @@ fun PhotoButton(imageCaptureUseCase: ImageCapture, showResults: Boolean, setShow
                         override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
                             outputFileResults.savedUri?.let { uri ->
                                 // Process the image with justins API
+                                isProcessing = false
                             }
                         }
 
@@ -116,16 +110,15 @@ fun PhotoButton(imageCaptureUseCase: ImageCapture, showResults: Boolean, setShow
                 },
                 enabled = !isProcessing
             ) {
-                Text("Scan Vinyl Record", style = MaterialTheme.typography.titleMedium)
+                if(!isProcessing) { 
+                    Text("Scan Vinyl Record", style = MaterialTheme.typography.titleMedium) 
+                } else {
+                    Text("Processing", style = MaterialTheme.typography.titleMedium)
+                }
             }
 
             if (showResults && searchResults.isNotEmpty()) {
-                Button(
-                    onClick = { setShowResults(true)},
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("View Results (${searchResults.size})")
-                }
+                setShowResults(true)
             }
         }
 }
