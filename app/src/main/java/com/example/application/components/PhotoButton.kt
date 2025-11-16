@@ -282,18 +282,21 @@ suspend fun processVinylWithPython(
         )
         Log.d("VinylScanner", "✅ identify_album() returned")
 
-        // Convert Python dict to Java Map
-        val resultMap = result.toJava(Map::class.java) as Map<*, *>
-
+        // Access Python dict directly using PyObject methods (no conversion needed)
         Log.d("VinylScanner", "========================================")
         Log.d("VinylScanner", "📦 PYTHON RESULT")
         Log.d("VinylScanner", "========================================")
-        Log.d("VinylScanner", "Result map keys: ${resultMap.keys}")
-        Log.d("VinylScanner", "Result map: $resultMap")
+        Log.d("VinylScanner", "Result object: $result")
 
-        // Check for error
-        if (resultMap.containsKey("error")) {
-            val error = resultMap["error"].toString()
+        // Check for error using PyObject.get()
+        val errorCheck = try {
+            result.callAttr("get", "error")
+        } catch (e: Exception) {
+            null
+        }
+
+        if (errorCheck != null && errorCheck.toString() != "None") {
+            val error = errorCheck.toString()
             Log.e("VinylScanner", "❌ Python returned error: $error")
             withContext(Dispatchers.Main) {
                 onError(error)
@@ -301,9 +304,26 @@ suspend fun processVinylWithPython(
             return@withContext
         }
 
-        // Extract album and artist
-        val album = resultMap["album"]?.toString() ?: "Unknown Album"
-        val artist = resultMap["artist"]?.toString() ?: "Unknown Artist"
+        // Extract album and artist using PyObject methods directly
+        val albumObj = try {
+            result.callAttr("get", "album")
+        } catch (e: Exception) {
+            Log.w("VinylScanner", "Could not get album from result", e)
+            null
+        }
+
+        val artistObj = try {
+            result.callAttr("get", "artist")
+        } catch (e: Exception) {
+            Log.w("VinylScanner", "Could not get artist from result", e)
+            null
+        }
+
+        val album = albumObj?.toString() ?: "Unknown Album"
+        val artist = artistObj?.toString() ?: "Unknown Artist"
+
+        Log.d("VinylScanner", "Album object: $albumObj")
+        Log.d("VinylScanner", "Artist object: $artistObj")
 
         Log.d("VinylScanner", "========================================")
         Log.d("VinylScanner", "✅ SUCCESSFULLY IDENTIFIED")
