@@ -1,9 +1,10 @@
 import os
 import json
 import numpy as np
-import tensorflow as tf
+from PIL import Image
 from sklearn.preprocessing import normalize
-from tensorflow.keras.preprocessing.image import load_img, img_to_array
+import tflite_runtime.interpreter as tflite
+
 
 base_path = os.path.dirname(os.path.abspath(__file__))
 
@@ -19,7 +20,7 @@ with open(os.path.join(base_path, "labels.json"), "r", encoding="utf-8") as f:
 # -------------------------------------------
 tflite_path = os.path.join(base_path, "efficientnetb0_embed.tflite")
 
-interpreter = tf.lite.Interpreter(model_path=tflite_path)
+interpreter = tflite.Interpreter(model_path=tflite_path)
 interpreter.allocate_tensors()
 
 input_details = interpreter.get_input_details()
@@ -27,8 +28,37 @@ output_details = interpreter.get_output_details()
 
 
 # -------------------------------------------
-# Helper functions
+# Image preprocessing (PIL version)
 # -------------------------------------------
+def load_and_preprocess(path):
+    # Load with Pillow
+    img = Image.open(path).convert("RGB")
+    img = img.resize((224, 224), Image.BILINEAR)
+
+    # Convert to float32 numpy array
+    arr = np.array(img, dtype=np.float32)
+
+    # EfficientNet-like normalization (same as tf.keras preprocessing)
+    arr = arr / 127.5 - 1.0     # Match tf.keras.applications.efficientnet.preprocess_input
+
+    # Add batch dimension
+    return np.expand_dims(arr, axis=0)
+
+
+# -------------------------------------------
+# Helper to run the model
+# -------------------------------------------
+def get_embedding(path):
+    arr = load_and_preprocess(path)
+
+    interpreter.set_tensor(input_details[0]["index"], arr)
+    interpreter.invoke()
+
+    vec = interpreter.get_tensor(output_details[0]["index"])[0]
+
+    return normalize(vec.reshape(1, -1))[0]
+
+
 def parse_label(label):
     album, artist = label.split("---")
     album = album.replace("_", " ").title()
@@ -36,31 +66,17 @@ def parse_label(label):
     return album, artist
 
 
-def get_embedding(path):
-    # Load + preprocess
-    img = load_img(path, target_size=(224, 224))
-    arr = img_to_array(img)
-    arr = tf.keras.applications.efficientnet.preprocess_input(arr)
-    arr = np.expand_dims(arr, 0).astype(np.float32)
-
-    # Run TFLite inference
-    interpreter.set_tensor(input_details[0]["index"], arr)
-    interpreter.invoke()
-    vec = interpreter.get_tensor(output_details[0]["index"])[0]
-
-    # Normalize like original code
-    return normalize(vec.reshape(1, -1))[0]
-
-
+# -------------------------------------------
+# Prediction function
+# -------------------------------------------
 def predict(img_path, return_values=False):
     query_vec = get_embedding(img_path)
 
     scores = np.dot(embeddings, query_vec)
     idx = np.argmax(scores)
     best_score = scores[idx]
-    label = labels[idx]
 
-    album, artist = parse_label(label)
+    album, artist = parse_label(labels[idx])
 
     if return_values:
         return album, artist
