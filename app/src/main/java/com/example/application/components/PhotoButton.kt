@@ -73,6 +73,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import android.util.Log
 
+import androidx.fragment.app.Fragment
+import androidx.compose.ui.platform.LocalContext
+import android.content.ContentResolver
+
+import com.chaquo.python.Python
+import com.chaquo.python.android.AndroidPlatform
+import org.json.JSONObject
+
 @Composable
 fun PhotoButton(imageCaptureUseCase: ImageCapture, showResults: Boolean, setShowResults: (Boolean) -> Unit, searchResults: List<SearchResult>) {
     var isProcessing by remember { mutableStateOf(false) }
@@ -93,6 +101,10 @@ fun PhotoButton(imageCaptureUseCase: ImageCapture, showResults: Boolean, setShow
                     val callback = object : ImageCapture.OnImageSavedCallback {
                         override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
                             // image saved at file:///storage/emulated/0/Android/data/com.example.application/cache/vinyl_1763293439252.jpg
+                            //Python.start()
+                            val py = Python.getInstance()
+                            val module = py.getModule("predictor_from_image")
+                            val pyResult = module.callAttr("predict_from_image", "${outputFileResults.savedUri}")
                         }
 
                         override fun onError(exception: ImageCaptureException) {
@@ -121,14 +133,14 @@ fun PhotoButton(imageCaptureUseCase: ImageCapture, showResults: Boolean, setShow
         }
 }
 
-fun runPythonScript(scriptPath: String): Unit {
-    val process = ProcessBuilder(
-        "python3",
-        "/path/to/predict_from_image.py",
-        "/path/to/photo.jpg"
-    ).redirectErrorStream(true).start()
+// fun runPythonScript(scriptPath: String, photoPath: String): Unit {
+//     val process = ProcessBuilder(
+//         "python3",
+//         scriptPath,
+//         photoPath,
+//     ).redirectErrorStream(true).start()
 
-    val output = process.inputStream.bufferedReader().readText()
+//     val output = process.inputStream.bufferedReader().readText()
 
-    Log.d("IMPORTANT", "Python returned: $output")  // JSON string
-}
+//     Log.d("IMPORTANT", "Python returned: $output")  // JSON string
+// }
