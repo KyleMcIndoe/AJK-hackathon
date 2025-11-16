@@ -91,13 +91,30 @@ fun CameraAppScreen(
     var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
     var zoomLevel by remember { mutableFloatStateOf(0.0f) }
     val imageCaptureUseCase = remember { ImageCapture.Builder().build() }
+
     var showResults by remember { mutableStateOf(false) }
+    fun setShowResults(arg: Boolean): Unit {showResults = arg}
+
     var searchResults by remember { mutableStateOf<List<SearchResult>>(emptyList()) }
-    var isProcessing by remember { mutableStateOf(false) }
 
     val localContext = LocalContext.current
     val repository = remember { DiscogsRepository() }
     val scope = rememberCoroutineScope()
+
+    fun switchLensFacing(): Unit {
+        if(lensFacing == CameraSelector.LENS_FACING_FRONT) {
+            lensFacing = CameraSelector.LENS_FACING_BACK
+            return Unit
+        }
+        lensFacing = CameraSelector.LENS_FACING_FRONT
+    }
+
+    fun setZoomLevel(): Unit {
+        if(zoomLevel == 2.0f) {
+            zoomLevel = 0.5f
+        }
+        zoomLevel = zoomLevel + 0.5f
+    }
 
     Box {
         CameraPreview(
@@ -107,108 +124,12 @@ fun CameraAppScreen(
         )
 
         // Camera controls
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(16.dp)
+        Column (
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.Bottom
         ) {
-            if (isProcessing) {
-                CircularProgressIndicator(
-                    modifier = Modifier
-                        .align(Alignment.CenterHorizontally)
-                        .padding(16.dp)
-                )
-                Text(
-                    text = "Processing image...",
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
-                )
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                Button(onClick = { lensFacing = CameraSelector.LENS_FACING_FRONT }) {
-                    Text("Front")
-                }
-                Button(onClick = { lensFacing = CameraSelector.LENS_FACING_BACK }) {
-                    Text("Back")
-                }
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                Button(onClick = { zoomLevel = 0.0f }) {
-                    Text("1x")
-                }
-                Button(onClick = { zoomLevel = 0.5f }) {
-                    Text("1.5x")
-                }
-                Button(onClick = { zoomLevel = 1.0f }) {
-                    Text("2x")
-                }
-            }
-
-            Button(
-                onClick = {
-                    isProcessing = true
-                    val outputFileOptions = ImageCapture.OutputFileOptions.Builder(
-                        File(localContext.externalCacheDir, "vinyl_${System.currentTimeMillis()}.jpg")
-                    ).build()
-
-                    val callback = object : ImageCapture.OnImageSavedCallback {
-                        override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                            outputFileResults.savedUri?.let { uri ->
-                                // Process the image with ML Kit
-                                scope.launch {
-                                    processImageAndSearch(
-                                        context = localContext,
-                                        uri = uri,
-                                        repository = repository,
-                                        onResults = { results ->
-                                            searchResults = results
-                                            showResults = true
-                                            isProcessing = false
-                                        },
-                                        onError = {
-                                            isProcessing = false
-                                        }
-                                    )
-                                }
-                            }
-                        }
-
-                        override fun onError(exception: ImageCaptureException) {
-                            Log.e("VinylScanner", "Photo capture failed", exception)
-                            isProcessing = false
-                        }
-                    }
-
-                    imageCaptureUseCase.takePicture(
-                        outputFileOptions,
-                        ContextCompat.getMainExecutor(localContext),
-                        callback
-                    )
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(60.dp),
-                enabled = !isProcessing
-            ) {
-                Text("Scan Vinyl Record", style = MaterialTheme.typography.titleMedium)
-            }
-
-            if (showResults && searchResults.isNotEmpty()) {
-                Button(
-                    onClick = { showResults = true },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("View Results (${searchResults.size})")
-                }
-            }
+            PhotoButton(imageCaptureUseCase, showResults, ::setShowResults, searchResults)
+            FooterNav(::switchLensFacing, ::setZoomLevel)
         }
     }
 
@@ -243,35 +164,6 @@ fun CameraAppScreen(
                 }
             }
         )
-    }
-}
-
-@Composable
-fun AlbumResultItem(result: SearchResult, onItemClick: (Long) -> Unit) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp),
-        onClick = { onItemClick(result.id) }
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = result.title,
-                style = MaterialTheme.typography.titleMedium
-            )
-            result.year?.let {
-                Text(
-                    text = "Year: $it",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-            result.genre?.let { genres ->
-                Text(
-                    text = "Genres: ${genres.joinToString(", ")}",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        }
     }
 }
 
@@ -312,6 +204,35 @@ suspend fun processImageAndSearch(
     } catch (e: Exception) {
         Log.e("VinylScanner", "Image processing failed", e)
         onError()
+    }
+}
+
+@Composable
+fun AlbumResultItem(result: SearchResult, onItemClick: (Long) -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(8.dp),
+        onClick = { onItemClick(result.id) }
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = result.title,
+                style = MaterialTheme.typography.titleMedium
+            )
+            result.year?.let {
+                Text(
+                    text = "Year: $it",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+            result.genre?.let { genres ->
+                Text(
+                    text = "Genres: ${genres.joinToString(", ")}",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
     }
 }
 
