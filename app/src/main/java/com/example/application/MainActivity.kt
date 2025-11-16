@@ -143,37 +143,37 @@ fun CameraAppScreen(
         }
     }
 
-    // Results dialog
-    if (showResults && searchResults.isNotEmpty()) {
-        AlertDialog(
-            onDismissRequest = { showResults = false },
-            title = { Text("Found Albums") },
-            text = {
-                LazyColumn {
-                    items(searchResults) { result ->
-                        AlbumResultItem(result) { releaseId ->
-                            scope.launch {
-                                repository.getReleaseDetails(releaseId).fold(
-                                    onSuccess = { release ->
-                                        showResults = false // Close dialog
-                                        onAlbumSelected(release) // Navigate to details screen
-                                    },
-                                    onFailure = { error ->
-                                        Log.e("VinylScanner", "Failed to get details", error)
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showResults = false }) {
-                    Text("Close")
-                }
-            }
-        )
-    }
+    // // Results dialog
+    // if (showResults && searchResults.isNotEmpty()) {
+    //     AlertDialog(
+    //         onDismissRequest = { showResults = false },
+    //         title = { Text("Found Albums") },
+    //         text = {
+    //             LazyColumn {
+    //                 items(searchResults) { result ->
+    //                     AlbumResultItem(result) { releaseId ->
+    //                         scope.launch {
+    //                             repository.getReleaseDetails(releaseId).fold(
+    //                                 onSuccess = { release ->
+    //                                     showResults = false // Close dialog
+    //                                     onAlbumSelected(release) // Navigate to details screen
+    //                                 },
+    //                                 onFailure = { error ->
+    //                                     Log.e("VinylScanner", "Failed to get details", error)
+    //                                 }
+    //                             )
+    //                         }
+    //                     }
+    //                 }
+    //             }
+    //         },
+    //         confirmButton = {
+    //             TextButton(onClick = { showResults = false }) {
+    //                 Text("Close")
+    //             }
+    //         }
+    //     )
+    // }
 }
 
 // This function is still used by some legacy code paths if needed

@@ -7,6 +7,8 @@ import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.background
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -19,7 +21,10 @@ import com.chaquo.python.PyObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+import androidx.compose.ui.graphics.Color
 import java.io.File
+import com.example.application.ui.theme.FooterTheme
 
 @Composable
 fun PhotoButton(
@@ -32,6 +37,8 @@ fun PhotoButton(
     var statusMessage by remember { mutableStateOf("Scan Vinyl Record") }
     val localContext = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    var outputTxt by remember {mutableStateOf("")}
 
     Column(
         modifier = Modifier
@@ -59,9 +66,9 @@ fun PhotoButton(
                 isProcessing = true
                 statusMessage = "Capturing image..."
 
-                Log.d("VinylScanner", "========================================")
-                Log.d("VinylScanner", "🎵 SCAN BUTTON PRESSED")
-                Log.d("VinylScanner", "========================================")
+                outputTxt = outputTxt + "\n" + ("========================================")
+                outputTxt = outputTxt + "\n" + ("🎵 SCAN BUTTON PRESSED")
+                outputTxt = outputTxt + "\n" + ("========================================")
 
                 val outputFileOptions = ImageCapture.OutputFileOptions.Builder(
                     File(localContext.externalCacheDir, "vinyl_${System.currentTimeMillis()}.jpg")
@@ -70,8 +77,9 @@ fun PhotoButton(
                 val callback = object : ImageCapture.OnImageSavedCallback {
                     override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
                         outputFileResults.savedUri?.let { uri ->
-                            Log.d("VinylScanner", "✅ Image saved successfully")
-                            Log.d("VinylScanner", "📁 URI: $uri")
+                            setShowResults(true)
+                            outputTxt = outputTxt + "\n" + ("✅ Image saved successfully")
+                            outputTxt = outputTxt + "\n" + ("📁 URI: $uri")
 
                             scope.launch {
                                 processVinylWithPython(
@@ -79,16 +87,16 @@ fun PhotoButton(
                                     imageUri = uri,
                                     onStatusUpdate = { status ->
                                         statusMessage = status
-                                        Log.d("VinylScanner", "📊 Status: $status")
+                                        outputTxt = outputTxt + "\n" + ("📊 Status: $status")
                                     },
                                     onComplete = { album, artist ->
                                         isProcessing = false
                                         statusMessage = "Found: $album by $artist"
-                                        Log.d("VinylScanner", "========================================")
-                                        Log.d("VinylScanner", "✅ IDENTIFICATION COMPLETE!")
-                                        Log.d("VinylScanner", "🎵 Album: $album")
-                                        Log.d("VinylScanner", "👤 Artist: $artist")
-                                        Log.d("VinylScanner", "========================================")
+                                        outputTxt = outputTxt + "\n" + ("========================================")
+                                        outputTxt = outputTxt + "\n" + ("✅ IDENTIFICATION COMPLETE!")
+                                        outputTxt = outputTxt + "\n" + ("🎵 Album: $album")
+                                        outputTxt = outputTxt + "\n" + ("👤 Artist: $artist")
+                                        outputTxt = outputTxt + "\n" + ("========================================")
                                     },
                                     onError = { error ->
                                         isProcessing = false
@@ -129,8 +137,22 @@ fun PhotoButton(
             )
         }
 
-        if (showResults && searchResults.isNotEmpty()) {
-            setShowResults(true)
+        if(showResults) {
+            FooterTheme {
+                Box(modifier = Modifier.background(Color.White)) {
+                    LazyColumn {
+                        item {
+                            Text(text = outputTxt)
+                        }
+
+                        item {
+                            TextButton(onClick = { setShowResults(false) }) {
+                                Text(text = "Close")
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
