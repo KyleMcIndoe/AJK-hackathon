@@ -51,7 +51,11 @@ chaquopy {
         
         pip {
             install("numpy")
-            install("pillow")
+            install("opencv-python")
+            install("tflite")
+            install("tflite-runtime")
+            install("scikit-learn")
+            install("Pillow")
         }
     }
     
