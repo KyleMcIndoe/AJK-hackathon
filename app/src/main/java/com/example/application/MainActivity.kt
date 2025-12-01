@@ -5,6 +5,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
+import android.view.Surface
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -37,6 +38,7 @@ import kotlin.coroutines.suspendCoroutine
 
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
+import com.example.application.components.PhotoButton
 
 class MainActivity : ComponentActivity() {
     private val repository = DiscogsRepository()
@@ -94,7 +96,14 @@ fun CameraAppScreen(
 ) {
     var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
     var zoomLevel by remember { mutableFloatStateOf(0.0f) }
-    val imageCaptureUseCase = remember { ImageCapture.Builder().build() }
+    val imageCaptureUseCase = remember {
+        ImageCapture.Builder()
+            .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+            .setTargetRotation(Surface.ROTATION_0)
+            .setJpegQuality(95)
+            .setFlashMode(ImageCapture.FLASH_MODE_AUTO)
+            .build()
+    }
 
     var showResults by remember { mutableStateOf(false) }
     fun setShowResults(arg: Boolean): Unit { showResults = arg }

@@ -27,6 +27,15 @@ def extract_cover(img_path, x1, y1, x2, y2):
         return None
 
     crop = img[y1:y2, x1:x2]
+
+    # Validate crop isn't empty
+    if crop.size == 0:
+        return None
+
+    # Validate crop isn't completely black
+    if crop.mean() < 5:
+        return None
+
     return crop
 
 

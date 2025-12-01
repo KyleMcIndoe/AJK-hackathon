@@ -21,6 +21,10 @@ def identify_album(image_path, x1, y1, x2, y2):
     if img is None:
         return {"error": "Image unreadable"}
 
+    # Check if image is completely black
+    if img.mean() < 5:  # Average pixel value < 5 (out of 255)
+        return {"error": "Image is completely black - insufficient lighting"}
+
     h, w = img.shape[:2]
 
     # If x2 and y2 are 0, use image width and height
@@ -36,7 +40,23 @@ def identify_album(image_path, x1, y1, x2, y2):
     temp_filename = f"temp_cover_{uuid.uuid4().hex}.jpg"
     temp_path = os.path.join(os.path.dirname(__file__), temp_filename)
 
-    cv2.imwrite(temp_path, cover)
+    write_success = cv2.imwrite(temp_path, cover)
+    if not write_success:
+        return {"error": "Failed to write temporary image file"}
+
+    # Verify file was written and has content
+    if not os.path.exists(temp_path):
+        return {"error": "Temporary image file was not created"}
+
+    file_size = os.path.getsize(temp_path)
+    if file_size == 0:
+        return {"error": "Temporary image file is empty"}
+
+    # Verify the written image can be read back
+    verify_img = cv2.imread(temp_path)
+    if verify_img is None:
+        os.remove(temp_path)
+        return {"error": "Temporary image file is corrupted"}
 
     # Predict
     album, artist = predict_album.predict(temp_path, return_values=True)

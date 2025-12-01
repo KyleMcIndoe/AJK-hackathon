@@ -1,4 +1,4 @@
-package com.example.application
+package com.example.application.components
 
 import android.content.Context
 import android.net.Uri
@@ -16,6 +16,7 @@ import androidx.core.content.ContextCompat
 import com.chaquo.python.Python
 import com.chaquo.python.PyException
 import com.chaquo.python.PyObject
+import com.example.application.SearchResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -57,26 +58,100 @@ fun PhotoButton(
         Button(
             onClick = {
                 isProcessing = true
-                statusMessage = "Capturing image..."
 
-                Log.d("VinylScanner", "========================================")
-                Log.d("VinylScanner", "🎵 SCAN BUTTON PRESSED")
-                Log.d("VinylScanner", "========================================")
+                scope.launch {
+                    // Camera warmup - allow auto-exposure and auto-focus to stabilize
+                    statusMessage = "Preparing camera..."
+                    Log.d("VinylScanner", "========================================")
+                    Log.d("VinylScanner", "🎵 SCAN BUTTON PRESSED")
+                    Log.d("VinylScanner", "🎥 Waiting for camera to stabilize...")
+                    Log.d("VinylScanner", "========================================")
 
-                val outputFileOptions = ImageCapture.OutputFileOptions.Builder(
-                    File(localContext.externalCacheDir, "vinyl_${System.currentTimeMillis()}.jpg")
-                ).build()
+                    kotlinx.coroutines.delay(500) // 500ms warmup
 
-                val callback = object : ImageCapture.OnImageSavedCallback {
-                    override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                        outputFileResults.savedUri?.let { uri ->
-                            Log.d("VinylScanner", "✅ Image saved successfully")
-                            Log.d("VinylScanner", "📁 URI: $uri")
+                    statusMessage = "Capturing image..."
+                    Log.d("VinylScanner", "📸 Camera ready, capturing now...")
+
+                    // Create file in cache directory
+                    val photoFile = File(
+                        localContext.externalCacheDir,
+                        "vinyl_${System.currentTimeMillis()}.jpg"
+                    )
+
+                    Log.d("VinylScanner", "📁 Will save to: ${photoFile.absolutePath}")
+
+                    val outputFileOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
+
+                    val callback = object : ImageCapture.OnImageSavedCallback {
+                        override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+                            Log.d("VinylScanner", "✅ Camera callback: onImageSaved called")
+                            Log.d("VinylScanner", "📁 Initial file size: ${photoFile.length()} bytes")
 
                             scope.launch {
+                                // Wait for file to be fully written
+                                var retries = 0
+                                val maxRetries = 10
+                                var fileReady = false
+
+                                while (retries < maxRetries && !fileReady) {
+                                    kotlinx.coroutines.delay(100) // Wait 100ms
+
+                                    val fileSize = photoFile.length()
+                                    val exists = photoFile.exists()
+                                    val canRead = photoFile.canRead()
+
+                                    Log.d("VinylScanner", "🔄 Check #$retries: exists=$exists, size=$fileSize, readable=$canRead")
+
+                                    // File is ready if it exists, is readable, and has data
+                                    if (exists && canRead && fileSize > 1000) { // At least 1KB
+                                        // Wait one more cycle to ensure it's stable
+                                        kotlinx.coroutines.delay(200)
+                                        val newSize = photoFile.length()
+
+                                        if (newSize == fileSize) {
+                                            // Size hasn't changed, file is complete!
+                                            fileReady = true
+                                            Log.d("VinylScanner", "✅ File is stable and ready!")
+                                            Log.d("VinylScanner", "📁 Final file size: $fileSize bytes")
+                                        } else {
+                                            Log.d("VinylScanner", "⏳ File still being written (size changed: $fileSize → $newSize)")
+                                        }
+                                    }
+
+                                    retries++
+                                }
+
+                                if (!fileReady) {
+                                    Log.e("VinylScanner", "❌ File not ready after ${maxRetries} retries!")
+                                    isProcessing = false
+                                    statusMessage = "Error: Image file not ready"
+                                    return@launch
+                                }
+
+                                // Validate image content
+                                statusMessage = "Validating image..."
+                                Log.d("VinylScanner", "🔍 Validating image content...")
+
+                                if (!validateImageContent(photoFile)) {
+                                    Log.e("VinylScanner", "❌ Image validation failed - too dark")
+                                    isProcessing = false
+                                    statusMessage = "Error: Image too dark. Try better lighting."
+                                    photoFile.delete()
+                                    return@launch
+                                }
+
+                                Log.d("VinylScanner", "✅ Image validation passed!")
+
+                                Log.d("VinylScanner", "========================================")
+                                Log.d("VinylScanner", "✅ FILE VERIFIED AND READY")
+                                Log.d("VinylScanner", "📁 Absolute path: ${photoFile.absolutePath}")
+                                Log.d("VinylScanner", "📁 File exists: ${photoFile.exists()}")
+                                Log.d("VinylScanner", "📁 File size: ${photoFile.length()} bytes")
+                                Log.d("VinylScanner", "========================================")
+
                                 processVinylWithPython(
                                     context = localContext,
-                                    imageUri = uri,
+                                    imageFile = photoFile,
                                     onStatusUpdate = { status ->
                                         statusMessage = status
                                         Log.d("VinylScanner", "📊 Status: $status")
@@ -100,25 +175,21 @@ fun PhotoButton(
                                     }
                                 )
                             }
-                        } ?: run {
+                        }
+
+                        override fun onError(exception: ImageCaptureException) {
                             isProcessing = false
-                            statusMessage = "Failed to save image"
-                            Log.e("VinylScanner", "❌ Failed to get saved URI")
+                            statusMessage = "Camera error"
+                            Log.e("VinylScanner", "❌ Photo capture failed", exception)
                         }
                     }
 
-                    override fun onError(exception: ImageCaptureException) {
-                        isProcessing = false
-                        statusMessage = "Camera error"
-                        Log.e("VinylScanner", "❌ Photo capture failed", exception)
-                    }
+                    imageCaptureUseCase.takePicture(
+                        outputFileOptions,
+                        ContextCompat.getMainExecutor(localContext),
+                        callback
+                    )
                 }
-
-                imageCaptureUseCase.takePicture(
-                    outputFileOptions,
-                    ContextCompat.getMainExecutor(localContext),
-                    callback
-                )
             },
             enabled = !isProcessing,
             modifier = Modifier.fillMaxWidth()
@@ -136,11 +207,63 @@ fun PhotoButton(
 }
 
 /**
- * Process vinyl image with Python scripts WITH DEBUG LOGGING
+ * Validates that the captured image is not completely black or corrupted
+ */
+fun validateImageContent(photoFile: File): Boolean {
+    try {
+        val options = android.graphics.BitmapFactory.Options().apply {
+            inSampleSize = 4 // Downsample for faster validation
+        }
+        val bitmap = android.graphics.BitmapFactory.decodeFile(photoFile.absolutePath, options)
+
+        if (bitmap == null) {
+            Log.e("VinylScanner", "❌ Bitmap decoding failed")
+            return false
+        }
+
+        // Sample pixels to check if image is completely black
+        val width = bitmap.width
+        val height = bitmap.height
+        val sampleSize = 100
+        var totalBrightness = 0
+
+        for (i in 0 until sampleSize) {
+            val x = (width * i / sampleSize).coerceIn(0, width - 1)
+            val y = (height * i / sampleSize).coerceIn(0, height - 1)
+            val pixel = bitmap.getPixel(x, y)
+
+            val r = (pixel shr 16) and 0xFF
+            val g = (pixel shr 8) and 0xFF
+            val b = pixel and 0xFF
+            val brightness = (r + g + b) / 3
+            totalBrightness += brightness
+        }
+
+        val avgBrightness = totalBrightness / sampleSize
+        Log.d("VinylScanner", "📊 Image average brightness: $avgBrightness/255")
+
+        bitmap.recycle()
+
+        // If average brightness is extremely low (< 10), image is likely all black
+        if (avgBrightness < 10) {
+            Log.e("VinylScanner", "❌ Image is too dark (avg: $avgBrightness)")
+            return false
+        }
+
+        return true
+    } catch (e: Exception) {
+        Log.e("VinylScanner", "❌ Image validation failed", e)
+        return false
+    }
+}
+
+/**
+ * Process vinyl image with your existing Python scripts
+ * Uses predict_from_image.py with x2=0, y2=0 to use full image (no cropping)
  */
 suspend fun processVinylWithPython(
     context: Context,
-    imageUri: Uri,
+    imageFile: File,
     onStatusUpdate: (String) -> Unit,
     onComplete: (album: String, artist: String) -> Unit,
     onError: (String) -> Unit
@@ -150,107 +273,50 @@ suspend fun processVinylWithPython(
         Log.d("VinylScanner", "🔄 STARTING PYTHON PROCESSING")
         Log.d("VinylScanner", "----------------------------------------")
 
-        // Get the actual file path from URI
-        val imagePath = imageUri.path ?: run {
-            Log.e("VinylScanner", "❌ Invalid image path from URI")
-            withContext(Dispatchers.Main) {
-                onError("Invalid image path")
-            }
-            return@withContext
-        }
+        // Get absolute path from File
+        val imagePath = imageFile.absolutePath
 
-        Log.d("VinylScanner", "📁 Image path: $imagePath")
+        Log.d("VinylScanner", "📁 Image file: ${imageFile.name}")
+        Log.d("VinylScanner", "📁 Absolute path: $imagePath")
+        Log.d("VinylScanner", "📁 File exists: ${imageFile.exists()}")
+        Log.d("VinylScanner", "📁 File readable: ${imageFile.canRead()}")
+        Log.d("VinylScanner", "📁 File size: ${imageFile.length()} bytes")
 
-        withContext(Dispatchers.Main) {
-            onStatusUpdate("Detecting vinyl...")
-        }
-
-        val python = Python.getInstance()
-        Log.d("VinylScanner", "✅ Python instance obtained")
-
-        // Load image to get dimensions
-        val file = File(imagePath)
-        if (!file.exists()) {
-            Log.e("VinylScanner", "❌ Image file does not exist at: $imagePath")
+        if (!imageFile.exists()) {
+            Log.e("VinylScanner", "❌ Image file does not exist!")
             withContext(Dispatchers.Main) {
                 onError("Image file not found")
             }
             return@withContext
         }
 
-        Log.d("VinylScanner", "✅ Image file exists")
-        Log.d("VinylScanner", "📊 File size: ${file.length()} bytes")
-
-        val img = android.graphics.BitmapFactory.decodeFile(imagePath)
-
-        if (img == null) {
-            Log.e("VinylScanner", "❌ Could not decode image file")
+        if (imageFile.length() == 0L) {
+            Log.e("VinylScanner", "❌ Image file is empty (0 bytes)!")
             withContext(Dispatchers.Main) {
-                onError("Could not load image")
+                onError("Image file is empty")
             }
             return@withContext
         }
 
-        val width = img.width
-        val height = img.height
-        img.recycle()  // Free memory
-
-        Log.d("VinylScanner", "========================================")
-        Log.d("VinylScanner", "📐 IMAGE DIMENSIONS")
-        Log.d("VinylScanner", "========================================")
-        Log.d("VinylScanner", "Width:  $width px")
-        Log.d("VinylScanner", "Height: $height px")
-        Log.d("VinylScanner", "Aspect ratio: ${width.toFloat() / height.toFloat()}")
-
-        // Default to full image (you can add vinyl detection here later)
-        var x1 = 0
-        var y1 = 0
-        var x2 = width
-        var y2 = height
-
-        Log.d("VinylScanner", "========================================")
-        Log.d("VinylScanner", "📍 DEFAULT COORDINATES (FULL IMAGE)")
-        Log.d("VinylScanner", "========================================")
-        Log.d("VinylScanner", "x1 (upper-left X):  $x1")
-        Log.d("VinylScanner", "y1 (upper-left Y):  $y1")
-        Log.d("VinylScanner", "x2 (lower-right X): $x2")
-        Log.d("VinylScanner", "y2 (lower-right Y): $y2")
-        Log.d("VinylScanner", "Crop dimensions: ${x2-x1} x ${y2-y1} px")
-
-        // Optional: Uncomment to add vinyl detection
-        /*
-        Log.d("VinylScanner", "🔍 Attempting vinyl detection...")
-        try {
-            val detectorModule = python.getModule("vinyl_detector")
-            Log.d("VinylScanner", "✅ vinyl_detector module loaded")
-
-            val boxResult = detectorModule.callAttr("detect_vinyl", imagePath)
-            Log.d("VinylScanner", "✅ detect_vinyl() called successfully")
-
-            // Convert Python dict to Java Map
-            val boxMap = boxResult.toJava(Map::class.java) as Map<*, *>
-
-            x1 = boxMap["x1"].toString().toInt()
-            y1 = boxMap["y1"].toString().toInt()
-            x2 = boxMap["x2"].toString().toInt()
-            y2 = boxMap["y2"].toString().toInt()
-
-            Log.d("VinylScanner", "========================================")
-            Log.d("VinylScanner", "📍 DETECTED COORDINATES")
-            Log.d("VinylScanner", "========================================")
-            Log.d("VinylScanner", "x1 (upper-left X):  $x1")
-            Log.d("VinylScanner", "y1 (upper-left Y):  $y1")
-            Log.d("VinylScanner", "x2 (lower-right X): $x2")
-            Log.d("VinylScanner", "y2 (lower-right Y): $y2")
-            Log.d("VinylScanner", "Detected crop: ${x2-x1} x ${y2-y1} px")
-            Log.d("VinylScanner", "Crop percentage: ${((x2-x1) * (y2-y1) * 100.0 / (width * height)).toInt()}% of image")
-
-        } catch (e: Exception) {
-            Log.w("VinylScanner", "⚠️ Vinyl detection failed, using full image", e)
-            Log.w("VinylScanner", "Error message: ${e.message}")
-            // Keep using full image coordinates
+        withContext(Dispatchers.Main) {
+            onStatusUpdate("Loading image...")
         }
-        */
+
+        val python = Python.getInstance()
+        Log.d("VinylScanner", "✅ Python instance obtained")
+
+        // Load image to get dimensions
+        val img = android.graphics.BitmapFactory.decodeFile(imagePath)
+        if (img == null) {
+            Log.e("VinylScanner", "❌ Could not decode image file")
+            withContext(Dispatchers.Main) { onError("Could not load image") }
+            return@withContext
+        }
+        img.recycle()
+
+        Log.d("VinylScanner", "========================================")
+        Log.d("VinylScanner", "📍 COORDINATES (FULL IMAGE MODE)")
+        Log.d("VinylScanner", "========================================")
 
         Log.d("VinylScanner", "========================================")
         Log.d("VinylScanner", "🐍 CALLING PYTHON PREDICTION")
@@ -259,30 +325,26 @@ suspend fun processVinylWithPython(
         Log.d("VinylScanner", "Function: identify_album")
         Log.d("VinylScanner", "Arguments:")
         Log.d("VinylScanner", "  - image_path: $imagePath")
-        Log.d("VinylScanner", "  - x1: $x1")
-        Log.d("VinylScanner", "  - y1: $y1")
-        Log.d("VinylScanner", "  - x2: $x2")
-        Log.d("VinylScanner", "  - y2: $y2")
 
         withContext(Dispatchers.Main) {
             onStatusUpdate("Identifying album...")
         }
 
-        // Call predict_from_image.py with coordinates
+        // Call your existing predict_from_image.py
         val predictModule = python.getModule("predict_from_image")
         Log.d("VinylScanner", "✅ predict_from_image module loaded")
 
         val result: PyObject = predictModule.callAttr(
             "identify_album",
             imagePath,
-            x1,
-            y1,
-            x2,
-            y2
+            0,
+            0,
+            0,
+            0
         )
         Log.d("VinylScanner", "✅ identify_album() returned")
 
-        // Access Python dict directly using PyObject methods (no conversion needed)
+        // Access Python dict directly using PyObject methods
         Log.d("VinylScanner", "========================================")
         Log.d("VinylScanner", "📦 PYTHON RESULT")
         Log.d("VinylScanner", "========================================")
